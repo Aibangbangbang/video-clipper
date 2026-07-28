@@ -14,6 +14,7 @@ class Transcriber:
 
     def _load_model(self):
         if self.model is None:
+            self._preload_cuda_libs()
             from faster_whisper import WhisperModel
             print(f"[转写] 加载 Whisper 模型: {config.whisper.model_size} "
                   f"({config.whisper.device}/{config.whisper.compute_type})")
@@ -23,6 +24,25 @@ class Transcriber:
                 compute_type=config.whisper.compute_type,
             )
         return self.model
+
+    @staticmethod
+    def _preload_cuda_libs():
+        """预加载 CUDA 库（WSL 缺少 libcublas，从 pip 包显式加载）"""
+        if config.whisper.device != "cuda":
+            return
+        import ctypes
+        import glob
+        nvidia_base = os.path.expanduser("~/.local/lib/python3.10/site-packages/nvidia")
+        if not os.path.isdir(nvidia_base):
+            return
+        # 按依赖顺序加载
+        for lib_name in ["libcublasLt.so.12", "libcublas.so.12", "libnvrtc.so.12"]:
+            for path in glob.glob(os.path.join(nvidia_base, "*", "lib", lib_name)):
+                try:
+                    ctypes.CDLL(path)
+                    print(f"[转写] 预加载CUDA库: {lib_name}")
+                except Exception as e:
+                    print(f"[转写] 预加载失败 {lib_name}: {e}")
 
     def extract_audio(self, video_path: str, audio_path: str):
         """从视频提取 16kHz 单声道 wav（whisper 要求）"""

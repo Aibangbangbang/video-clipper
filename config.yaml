@@ -6,8 +6,8 @@ paths:
 
 whisper:
   model_size: medium       # tiny/base/small/medium/large-v3
-  device: cpu              # cpu / cuda
-  compute_type: int8       # int8(CPU最优) / float16(GPU) / float32
+  device: cuda             # cpu / cuda
+  compute_type: float16    # float16(GPU最优) / int8(CPU) / int8_float16(混合)
   language: zh             # 转写语言
 
 ffmpeg:

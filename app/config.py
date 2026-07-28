@@ -4,6 +4,21 @@ from pathlib import Path
 from dataclasses import dataclass, field
 import yaml
 
+# HuggingFace 国内镜像（解决直连不可达问题）
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
+# CUDA 库路径（WSL 环境缺少 libcublas，从 pip 包中加载）
+_nvidia_base = os.path.expanduser("~/.local/lib/python3.10/site-packages/nvidia")
+if os.path.isdir(_nvidia_base):
+    _lib_paths = []
+    for _sub in os.listdir(_nvidia_base):
+        _lib_dir = os.path.join(_nvidia_base, _sub, "lib")
+        if os.path.isdir(_lib_dir):
+            _lib_paths.append(_lib_dir)
+    if _lib_paths:
+        _existing = os.environ.get("LD_LIBRARY_PATH", "")
+        os.environ["LD_LIBRARY_PATH"] = ":".join(_lib_paths) + (":" + _existing if _existing else "")
+
 
 @dataclass
 class WhisperConfig:
