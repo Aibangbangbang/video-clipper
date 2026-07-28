@@ -1,0 +1,23 @@
+# 视频处理配置
+paths:
+  uploads: ./uploads
+  output: ./output
+  temp: ./temp
+
+whisper:
+  model_size: medium       # tiny/base/small/medium/large-v3
+  device: cpu              # cpu / cuda
+  compute_type: int8       # int8(CPU最优) / float16(GPU) / float32
+  language: zh             # 转写语言
+
+ffmpeg:
+  codec: libx264
+  crf: 23
+
+silence:
+  noise_db: -30            # 静音阈值(dB)，-30较宽松，-40更严格
+  min_duration: 0.5        # 最短静音时长(秒)，短于此不删
+
+server:
+  host: 0.0.0.0
+  port: 8000

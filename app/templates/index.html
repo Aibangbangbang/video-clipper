@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频智能剪辑系统</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div class="app-header">
+        <div>
+            <h1>🎬 视频智能剪辑系统</h1>
+            <div class="subtitle">静音删除 · 语音转文字 · 关键词删片</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 上传区 -->
+        <div class="upload-zone" id="uploadZone">
+            <div class="icon">📹</div>
+            <div class="hint">点击或拖拽视频文件到这里上传（支持 mp4/mkv/avi/mov/webm）</div>
+            <input type="file" id="fileInput" accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.ts">
+        </div>
+
+        <!-- 视频列表 -->
+        <div class="video-list" id="videoList"></div>
+
+        <!-- 工作区 -->
+        <div id="workspace" class="collapsed">
+            <!-- 语音转文字 -->
+            <div class="panel">
+                <h3>📝 第一步：语音转文字</h3>
+                <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
+                    当前视频：<strong id="currentVideo"></strong><br>
+                    本地 Whisper 转写（中文），CPU 模式较慢，也可直接导入 SRT/VTT 字幕跳过转写。
+                </p>
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="startTranscribe()">开始转写</button>
+                    <input type="file" id="subtitleFile" accept=".srt,.vtt" style="font-size:12px;">
+                    <button class="btn btn-warn" onclick="uploadSubtitle()">导入字幕</button>
+                </div>
+            </div>
+
+            <!-- 字幕预览 -->
+            <div class="panel">
+                <h3>💬 字幕预览</h3>
+                <div class="transcript-box" id="transcriptBox">
+                    <div class="empty">暂无字幕</div>
+                </div>
+            </div>
+
+            <!-- 剪辑设置 -->
+            <div class="panel">
+                <h3>✂️ 第二步：智能剪辑</h3>
+
+                <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:240px;">
+                        <div class="field">
+                            <label>静音阈值 (dB)</label>
+                            <input type="number" id="noiseDb" value="-30" step="1">
+                            <div class="desc">越小越严格。-30 宽松（保留更多），-40 严格（删更多静音）</div>
+                        </div>
+                        <div class="field">
+                            <label>最短静音时长 (秒)</label>
+                            <input type="number" id="minDuration" value="0.5" step="0.1">
+                            <div class="desc">短于此值的静音不删除</div>
+                        </div>
+                    </div>
+
+                    <div style="flex:1;min-width:240px;">
+                        <div class="field">
+                            <label>关键词黑名单（逗号或换行分隔）</label>
+                            <textarea id="keywords" placeholder="输入要删除的关键词，如：&#10;广告,关注,点赞,谢谢观看"></textarea>
+                            <div class="desc">命中关键词的字幕段将被整段删除</div>
+                        </div>
+                        <div class="field">
+                            <label>前后留白 (秒)</label>
+                            <input type="number" id="margin" value="0.3" step="0.1">
+                            <div class="desc">命中段前后各保留的秒数，避免截断</div>
+                        </div>
+                        <button class="btn btn-warn btn-sm" onclick="previewKeywords()">预览命中</button>
+                    </div>
+                </div>
+
+                <div class="btn-row" style="margin-top:20px;border-top:1px solid #ecf0f1;padding-top:16px;">
+                    <button class="btn btn-success" onclick="clipSilence()">① 仅删除静音</button>
+                    <button class="btn btn-success" onclick="clipKeywords()">② 仅删除关键词片段</button>
+                    <button class="btn btn-primary" onclick="clipCombo()">③ 组合（去静音+去关键词）</button>
+                </div>
+            </div>
+
+            <!-- 剪辑结果 -->
+            <div class="panel">
+                <h3>📦 剪辑结果</h3>
+                <div id="resultList">
+                    <div class="empty">暂无剪辑结果</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
