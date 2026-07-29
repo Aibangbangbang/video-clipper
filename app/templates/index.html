@@ -90,6 +90,12 @@
                             <div class="desc">不整段删除，而是随机删除片段中部分帧，每次结果不同</div>
                         </div>
                         <div class="field">
+                            <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" id="smartGap" checked> 智能句中保护
+                            </label>
+                            <div class="desc">句中短停顿只散粒删1-2帧，句间长停顿才大面积删除</div>
+                        </div>
+                        <div class="field">
                             <label>最少删除比例</label>
                             <input type="number" id="minRatio" value="0.5" step="0.1" min="0" max="1">
                             <div class="desc">每个片段至少删除的比例（0.5=至少删一半）</div>

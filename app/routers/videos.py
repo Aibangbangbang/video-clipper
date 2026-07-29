@@ -15,7 +15,10 @@ from app.config import config
 from app.database import Video, Transcript, ClipResult, SessionLocal
 from app.services.clipper import clipper, intersect_ranges
 from app.services.transcriber import transcriber
-from app.services.silence_detector import detect_silence, Range, ranges_to_dict_list, complement_ranges, randomize_removed_ranges
+from app.services.silence_detector import (
+    detect_silence, Range, ranges_to_dict_list, complement_ranges,
+    randomize_removed_ranges, classify_and_randomize,
+)
 from app.services.keyword_filter import filter_by_keywords, merge_ranges, segments_to_keep_ranges
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
@@ -222,6 +225,7 @@ class SilenceParams(BaseModel):
     random_delete: bool = False
     min_ratio: float = 0.5
     max_ratio: float = 1.0
+    smart_gap: bool = True
 
 
 @router.post("/{video_id}/clip-silence")
@@ -233,6 +237,8 @@ async def clip_silence(video_id: str, params: SilenceParams):
             raise HTTPException(404, "视频不存在")
         filepath = v.filepath
         duration = v.duration
+        t = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+        segments = t.segments if t else []
     finally:
         db.close()
 
@@ -242,9 +248,14 @@ async def clip_silence(video_id: str, params: SilenceParams):
     def _do():
         silence_ranges, _ = detect_silence(filepath, noise_db, min_dur)
         if params.random_delete:
-            # 随机删除每个静音片段的部分帧，保留剩余
-            actual_removed = randomize_removed_ranges(
-                silence_ranges, params.min_ratio, params.max_ratio)
+            if params.smart_gap and segments:
+                # 智能模式：句中 gap 散粒删除，句间 gap 大面积删除
+                actual_removed = classify_and_randomize(
+                    silence_ranges, segments, duration,
+                    params.min_ratio, params.max_ratio)
+            else:
+                actual_removed = randomize_removed_ranges(
+                    silence_ranges, params.min_ratio, params.max_ratio)
             keep_ranges = complement_ranges(actual_removed, duration)
         else:
             actual_removed = silence_ranges
@@ -263,7 +274,8 @@ async def clip_silence(video_id: str, params: SilenceParams):
                 output_path=out,
                 params={"noise_db": noise_db, "min_duration": min_dur,
                         "random_delete": params.random_delete,
-                        "min_ratio": params.min_ratio, "max_ratio": params.max_ratio},
+                        "min_ratio": params.min_ratio, "max_ratio": params.max_ratio,
+                        "smart_gap": params.smart_gap},
             )
             db2.add(cr)
             db2.commit()
@@ -336,6 +348,7 @@ class NoTextParams(BaseModel):
     random_delete: bool = False
     min_ratio: float = 0.5
     max_ratio: float = 1.0
+    smart_gap: bool = True
 
 
 @router.post("/{video_id}/clip-no-text")
@@ -361,9 +374,14 @@ async def clip_no_text(video_id: str, params: NoTextParams):
             raise ValueError("未识别到任何文字，无法处理")
         removed = complement_ranges(text_keep, duration)
         if params.random_delete:
-            # 随机删除每个无文字片段的部分帧，保留剩余
-            actual_removed = randomize_removed_ranges(
-                removed, params.min_ratio, params.max_ratio)
+            if params.smart_gap:
+                # 智能模式：句中 gap 散粒删除，句间 gap 大面积删除
+                actual_removed = classify_and_randomize(
+                    removed, segments, duration,
+                    params.min_ratio, params.max_ratio)
+            else:
+                actual_removed = randomize_removed_ranges(
+                    removed, params.min_ratio, params.max_ratio)
             keep = complement_ranges(actual_removed, duration)
         else:
             actual_removed = removed
@@ -381,7 +399,8 @@ async def clip_no_text(video_id: str, params: NoTextParams):
                 output_path=out,
                 params={"margin": params.margin,
                         "random_delete": params.random_delete,
-                        "min_ratio": params.min_ratio, "max_ratio": params.max_ratio},
+                        "min_ratio": params.min_ratio, "max_ratio": params.max_ratio,
+                        "smart_gap": params.smart_gap},
             )
             db2.add(cr)
             db2.commit()
@@ -407,6 +426,7 @@ class ComboParams(BaseModel):
     random_delete: bool = False
     min_ratio: float = 0.5
     max_ratio: float = 1.0
+    smart_gap: bool = True
 
 
 @router.post("/{video_id}/clip-combo")
@@ -433,8 +453,13 @@ async def clip_combo(video_id: str, params: ComboParams):
         # 1. 静音检测
         silence_ranges, _ = detect_silence(filepath, noise_db, min_dur)
         if params.random_delete:
-            actual_silence = randomize_removed_ranges(
-                silence_ranges, params.min_ratio, params.max_ratio)
+            if params.smart_gap and segments:
+                actual_silence = classify_and_randomize(
+                    silence_ranges, segments, duration,
+                    params.min_ratio, params.max_ratio)
+            else:
+                actual_silence = randomize_removed_ranges(
+                    silence_ranges, params.min_ratio, params.max_ratio)
         else:
             actual_silence = silence_ranges
         final_keep = complement_ranges(actual_silence, duration)
@@ -444,8 +469,13 @@ async def clip_combo(video_id: str, params: ComboParams):
             text_keep = segments_to_keep_ranges(segments, params.no_text_margin)
             if params.random_delete:
                 text_removed = complement_ranges(text_keep, duration)
-                actual_text_removed = randomize_removed_ranges(
-                    text_removed, params.min_ratio, params.max_ratio)
+                if params.smart_gap:
+                    actual_text_removed = classify_and_randomize(
+                        text_removed, segments, duration,
+                        params.min_ratio, params.max_ratio)
+                else:
+                    actual_text_removed = randomize_removed_ranges(
+                        text_removed, params.min_ratio, params.max_ratio)
                 text_keep = complement_ranges(actual_text_removed, duration)
             final_keep = intersect_ranges(final_keep, text_keep)
 
@@ -475,7 +505,8 @@ async def clip_combo(video_id: str, params: ComboParams):
                         "remove_no_text": params.remove_no_text,
                         "no_text_margin": params.no_text_margin,
                         "random_delete": params.random_delete,
-                        "min_ratio": params.min_ratio, "max_ratio": params.max_ratio},
+                        "min_ratio": params.min_ratio, "max_ratio": params.max_ratio,
+                        "smart_gap": params.smart_gap},
             )
             db2.add(cr)
             db2.commit()

@@ -160,6 +160,7 @@ function getRandomParams() {
         random_delete: document.getElementById('randomDelete').checked,
         min_ratio: parseFloat(document.getElementById('minRatio').value) || 0.5,
         max_ratio: parseFloat(document.getElementById('maxRatio').value) || 1.0,
+        smart_gap: document.getElementById('smartGap').checked,
     };
 }
 

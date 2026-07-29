@@ -190,3 +190,127 @@ def randomize_removed_ranges(
             actual.append(Range(r.start + offset, r.start + offset + delete_len))
 
     return actual
+
+
+def scatter_delete_range(
+    r: Range,
+    fps: float = 30.0,
+    seed: Optional[int] = None,
+) -> List[Range]:
+    """散粒删除：在区间内每隔随机帧数删除 1-2 帧
+
+    用于「句中 gap」场景：无音/无字幕片段位于一句完整的话中间，
+    不大面积删除（避免切断语义），而是每隔随机帧数删掉 1-2 帧，
+    既消除同质化又保持语音连贯。
+
+    Args:
+        r:   待处理区间
+        fps: 视频帧率，用于计算帧时长
+        seed: 随机种子
+
+    Returns:
+        实际删除的微小区间列表（每个 1-2 帧）
+    """
+    rng = random.Random(seed) if seed is not None else random.Random()
+    frame_dur = 1.0 / fps
+    duration = r.end - r.start
+    if duration <= frame_dur * 3:
+        # 太短，不值得散粒删除，跳过
+        return []
+
+    deleted = []
+    pos = r.start + rng.uniform(0, frame_dur * 2)  # 随机起始偏移
+    while pos < r.end - frame_dur:
+        # 随机删除 1-2 帧
+        n_frames = rng.randint(1, 2)
+        del_end = min(pos + n_frames * frame_dur, r.end)
+        deleted.append(Range(pos, del_end))
+        # 随机间隔 3-15 帧后继续
+        gap_frames = rng.randint(3, 15)
+        pos = del_end + gap_frames * frame_dur
+
+    return deleted
+
+
+def classify_and_randomize(
+    removed: List[Range],
+    segments: List[dict],
+    duration: float,
+    min_ratio: float = 0.5,
+    max_ratio: float = 1.0,
+    fps: float = 30.0,
+    sentence_gap_threshold: float = 1.5,
+    seed: Optional[int] = None,
+) -> List[Range]:
+    """智能随机删除：区分句间 gap 和句中 gap，采用不同策略
+
+    - 句间 gap（前后属于不同句子/长时间停顿）：大面积随机删除
+    - 句中 gap（前后属于同一句完整话语）：散粒删除 1-2 帧，保持连贯
+
+    判定逻辑：如果一个 removed 区间的前后都有 transcript segment，
+    且前后 segment 的时间差（即该 gap 的时长）小于 sentence_gap_threshold，
+    则认为是句中 gap。
+
+    Args:
+        removed:                  原始待删除区间列表
+        segments:                 转写片段 [{start, end, text}, ...]
+        duration:                 视频总时长
+        min_ratio / max_ratio:    句间 gap 的随机删除比例范围
+        fps:                      视频帧率
+        sentence_gap_threshold:   句中 gap 判定阈值（秒），小于此值认为是句中
+        seed:                     随机种子
+
+    Returns:
+        实际删除的区间列表
+    """
+    rng = random.Random(seed) if seed is not None else random.Random()
+    if not removed:
+        return []
+
+    # 构建 segment 时间端点列表，用于判断 removed 区间前后是否有文字
+    seg_starts = sorted(s["start"] for s in segments) if segments else []
+    seg_ends = sorted(s["end"] for s in segments) if segments else []
+
+    import bisect
+
+    actual = []
+    for r in removed:
+        dur = r.end - r.start
+        if dur <= 0:
+            continue
+
+        # 查找 r.start 之前最近的 segment end（即 gap 前面有没有文字）
+        idx_before = bisect.bisect_right(seg_ends, r.start) - 1
+        has_text_before = idx_before >= 0 and (r.start - seg_ends[idx_before]) < 0.5
+
+        # 查找 r.end 之后最近的 segment start（即 gap 后面有没有文字）
+        idx_after = bisect.bisect_left(seg_starts, r.end)
+        has_text_after = idx_after < len(seg_starts) and (seg_starts[idx_after] - r.end) < 0.5
+
+        is_mid_sentence = (
+            has_text_before and has_text_after and dur < sentence_gap_threshold
+        )
+
+        if is_mid_sentence:
+            # 句中 gap：散粒删除 1-2 帧
+            scattered = scatter_delete_range(r, fps=fps, seed=rng.randint(0, 999999))
+            if scattered:
+                actual.extend(scattered)
+                print(f"  [句中gap] {r.start:.2f}-{r.end:.2f} ({dur:.2f}s) "
+                      f"-> 散粒删除 {len(scattered)} 处")
+            else:
+                print(f"  [句中gap] {r.start:.2f}-{r.end:.2f} ({dur:.2f}s) -> 跳过(太短)")
+        else:
+            # 句间 gap：大面积随机删除
+            ratio = rng.uniform(min_ratio, max_ratio)
+            delete_len = dur * ratio
+            max_offset = dur - delete_len
+            if max_offset <= 0:
+                actual.append(Range(r.start, r.end))
+            else:
+                offset = rng.uniform(0, max_offset)
+                actual.append(Range(r.start + offset, r.start + offset + delete_len))
+            print(f"  [句间gap] {r.start:.2f}-{r.end:.2f} ({dur:.2f}s) "
+                  f"-> 删除 {delete_len:.2f}s")
+
+    return actual
