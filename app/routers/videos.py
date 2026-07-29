@@ -15,8 +15,8 @@ from app.config import config
 from app.database import Video, Transcript, ClipResult, SessionLocal
 from app.services.clipper import clipper, intersect_ranges
 from app.services.transcriber import transcriber
-from app.services.silence_detector import detect_silence, Range, ranges_to_dict_list
-from app.services.keyword_filter import filter_by_keywords, merge_ranges
+from app.services.silence_detector import detect_silence, Range, ranges_to_dict_list, complement_ranges
+from app.services.keyword_filter import filter_by_keywords, merge_ranges, segments_to_keep_ranges
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -315,6 +315,59 @@ async def clip_keywords(video_id: str, params: KeywordParams):
     return result
 
 
+# ─── 剪辑：删除无文字部分 ───
+
+class NoTextParams(BaseModel):
+    margin: float = 0.2
+
+
+@router.post("/{video_id}/clip-no-text")
+async def clip_no_text(video_id: str, params: NoTextParams):
+    """删除视频中没有识别到文字的部分（保留有语音内容的片段）"""
+    db = SessionLocal()
+    try:
+        v = db.query(Video).filter(Video.id == video_id).first()
+        if not v:
+            raise HTTPException(404, "视频不存在")
+        filepath = v.filepath
+        duration = v.duration
+        t = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+        if not t:
+            raise HTTPException(400, "请先完成语音转文字")
+        segments = t.segments or []
+    finally:
+        db.close()
+
+    def _do():
+        keep = segments_to_keep_ranges(segments, params.margin)
+        if not keep:
+            raise ValueError("未识别到任何文字，无法处理")
+        removed = complement_ranges(keep, duration)
+        out = clipper.clip_by_ranges(
+            filepath, keep,
+            f"{video_id}_去无文字_{uuid.uuid4().hex[:6]}",
+        )
+        db2 = SessionLocal()
+        try:
+            cr = ClipResult(
+                video_id=video_id, clip_type="no_text",
+                keep_ranges=ranges_to_dict_list(keep),
+                removed_ranges=ranges_to_dict_list(removed),
+                output_path=out,
+                params={"margin": params.margin},
+            )
+            db2.add(cr)
+            db2.commit()
+            db2.refresh(cr)
+            return {"id": cr.id, "output_path": out,
+                    "keep_count": len(keep), "removed_count": len(removed)}
+        finally:
+            db2.close()
+
+    result = await asyncio.to_thread(_do)
+    return result
+
+
 # ─── 剪辑：组合（静音 + 关键词）───
 
 class ComboParams(BaseModel):
@@ -322,17 +375,20 @@ class ComboParams(BaseModel):
     noise_db: Optional[float] = None
     min_duration: Optional[float] = None
     margin: float = 0.3
+    remove_no_text: bool = False
+    no_text_margin: float = 0.2
 
 
 @router.post("/{video_id}/clip-combo")
 async def clip_combo(video_id: str, params: ComboParams):
-    """组合剪辑：先去静音，再去关键词，取交集"""
+    """组合剪辑：去静音 + 去无文字 + 去关键词，取交集"""
     db = SessionLocal()
     try:
         v = db.query(Video).filter(Video.id == video_id).first()
         if not v:
             raise HTTPException(404, "视频不存在")
         filepath = v.filepath
+        duration = v.duration
         t = db.query(Transcript).filter(Transcript.video_id == video_id).first()
         segments = t.segments if t else []
     finally:
@@ -342,18 +398,23 @@ async def clip_combo(video_id: str, params: ComboParams):
     min_dur = params.min_duration if params.min_duration is not None else config.silence.min_duration
 
     def _do():
-        # 1. 静音检测 → 有声区间
-        _, silence_keep = detect_silence(filepath, noise_db, min_dur)
+        all_removed = []
 
-        # 2. 关键词过滤（如果有关键词和字幕）
+        # 1. 静音检测 -> 有声区间
+        _, silence_keep = detect_silence(filepath, noise_db, min_dur)
+        final_keep = silence_keep
+
+        # 2. 去无文字（如果启用且有字幕）
+        if params.remove_no_text and segments:
+            text_keep = segments_to_keep_ranges(segments, params.no_text_margin)
+            final_keep = intersect_ranges(final_keep, text_keep)
+
+        # 3. 关键词过滤
         if params.keywords and segments:
             kw_keep, kw_removed = filter_by_keywords(segments, params.keywords, params.margin)
             kw_keep = merge_ranges(kw_keep)
-            # 3. 取交集
-            final_keep = intersect_ranges(silence_keep, kw_keep)
-        else:
-            kw_removed = []
-            final_keep = silence_keep
+            all_removed = kw_removed
+            final_keep = intersect_ranges(final_keep, kw_keep)
 
         if not final_keep:
             raise ValueError("组合后无保留内容")
@@ -367,16 +428,18 @@ async def clip_combo(video_id: str, params: ComboParams):
             cr = ClipResult(
                 video_id=video_id, clip_type="combo",
                 keep_ranges=ranges_to_dict_list(final_keep),
-                removed_ranges=ranges_to_dict_list(kw_removed),
+                removed_ranges=ranges_to_dict_list(all_removed),
                 output_path=out,
                 params={"keywords": params.keywords, "noise_db": noise_db,
-                        "min_duration": min_dur, "margin": params.margin},
+                        "min_duration": min_dur, "margin": params.margin,
+                        "remove_no_text": params.remove_no_text,
+                        "no_text_margin": params.no_text_margin},
             )
             db2.add(cr)
             db2.commit()
             db2.refresh(cr)
             return {"id": cr.id, "output_path": out,
-                    "keep_count": len(final_keep), "removed_count": len(kw_removed)}
+                    "keep_count": len(final_keep), "removed_count": len(all_removed)}
         finally:
             db2.close()
 

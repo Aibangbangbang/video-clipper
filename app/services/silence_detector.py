@@ -133,3 +133,18 @@ def _get_duration(media_path: str) -> float:
 
 def ranges_to_dict_list(ranges: List[Range]) -> List[dict]:
     return [r.to_dict() for r in ranges]
+
+
+def complement_ranges(keep: List[Range], duration: float) -> List[Range]:
+    """计算保留区间的补集（即被删除的区间）"""
+    if not keep:
+        return [Range(0, duration)] if duration > 0 else []
+    removed = []
+    prev_end = 0.0
+    for r in sorted(keep, key=lambda x: x.start):
+        if r.start > prev_end:
+            removed.append(Range(prev_end, r.start))
+        prev_end = max(prev_end, r.end)
+    if prev_end < duration:
+        removed.append(Range(prev_end, duration))
+    return removed

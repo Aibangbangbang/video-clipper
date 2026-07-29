@@ -173,6 +173,21 @@ async function clipSilence() {
     } catch (e) { toast(e.message, 'error'); }
 }
 
+// ─── 删除无文字部分 ───
+async function clipNoText() {
+    if (!currentVideoId) return;
+    const margin = parseFloat(document.getElementById('margin').value) || 0.2;
+    try {
+        toast('正在删除无文字片段...', 'info');
+        const data = await api(`${API}/${currentVideoId}/clip-no-text`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ margin }),
+        });
+        toast(`完成：保留${data.keep_count}段，删除${data.removed_count}段`, 'success');
+        await loadResults();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
 // ─── 关键词删除 ───
 function previewKeywords() {
     const raw = document.getElementById('keywords').value;
@@ -215,11 +230,12 @@ async function clipCombo() {
     const noiseDb = document.getElementById('noiseDb').value;
     const minDur = document.getElementById('minDuration').value;
     const margin = parseFloat(document.getElementById('margin').value) || 0.3;
-    const body = { keywords: kws, margin };
+    const removeNoText = document.getElementById('removeNoText').checked;
+    const body = { keywords: kws, margin, remove_no_text: removeNoText };
     if (noiseDb) body.noise_db = parseFloat(noiseDb);
     if (minDur) body.min_duration = parseFloat(minDur);
     try {
-        toast('正在组合剪辑（去静音+去关键词）...', 'info');
+        toast('正在组合剪辑...', 'info');
         const data = await api(`${API}/${currentVideoId}/clip-combo`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -236,7 +252,7 @@ async function loadResults() {
         const list = await api(`${API}/${currentVideoId}/results`);
         const box = document.getElementById('resultList');
         if (!list.length) { box.innerHTML = '<div class="empty">暂无剪辑结果</div>'; return; }
-        const typeMap = { silence: '删除静音', keyword: '删除关键词', combo: '组合剪辑' };
+        const typeMap = { silence: '删除静音', keyword: '删除关键词', no_text: '删除无文字', combo: '组合剪辑' };
         box.innerHTML = list.map(r => `
             <div class="result-item">
                 <div class="result-info">

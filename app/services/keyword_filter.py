@@ -76,3 +76,23 @@ def merge_ranges(ranges: List[Range]) -> List[Range]:
         else:
             merged.append(r)
     return merged
+
+
+def segments_to_keep_ranges(segments: List[dict], margin: float = 0.0) -> List[Range]:
+    """把转写 segments 转为有文字的保留区间（用于删除无文字部分）
+
+    Args:
+        segments: 转写片段 [{start, end, text}, ...]
+        margin:   每段前后扩展秒数，避免截断语音
+
+    Returns:
+        合并后的有文字保留区间列表
+    """
+    if not segments:
+        return []
+    ranges = []
+    for s in segments:
+        start = max(0.0, s["start"] - margin)
+        end = s["end"] + margin
+        ranges.append(Range(start, end))
+    return merge_ranges(ranges)

@@ -10,7 +10,7 @@
     <div class="app-header">
         <div>
             <h1>🎬 视频智能剪辑系统</h1>
-            <div class="subtitle">静音删除 · 语音转文字 · 关键词删片</div>
+            <div class="subtitle">静音删除 · 语音转文字 · 关键词删片 · 无文字删除</div>
         </div>
     </div>
 
@@ -84,8 +84,12 @@
 
                 <div class="btn-row" style="margin-top:20px;border-top:1px solid #ecf0f1;padding-top:16px;">
                     <button class="btn btn-success" onclick="clipSilence()">① 仅删除静音</button>
-                    <button class="btn btn-success" onclick="clipKeywords()">② 仅删除关键词片段</button>
-                    <button class="btn btn-primary" onclick="clipCombo()">③ 组合（去静音+去关键词）</button>
+                    <button class="btn btn-success" onclick="clipNoText()">② 仅删除无文字部分</button>
+                    <button class="btn btn-success" onclick="clipKeywords()">③ 仅删除关键词片段</button>
+                    <button class="btn btn-primary" onclick="clipCombo()">④ 组合剪辑</button>
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="removeNoText" checked> 组合含去无文字
+                    </label>
                 </div>
             </div>
 
