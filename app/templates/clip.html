@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}智能剪辑 - 视频智能系统{% endblock %}
+{% block subtitle %}按学习模板剪辑 · 静音删除 · 关键词删片 · 无文字删除{% endblock %}
+{% block nav_clip %}active{% endblock %}
+
+{% block content %}
+<!-- 上传区 -->
+<div class="upload-zone" id="uploadZone">
+    <div class="icon">✂️</div>
+    <div class="hint">上传待剪辑视频 — 点击或拖拽 mp4/mkv/avi/mov/webm</div>
+    <input type="file" id="fileInput" accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.ts">
+</div>
+
+<!-- 视频列表 -->
+<div class="video-list" id="videoList"></div>
+
+<!-- 剪辑工作区 -->
+<div id="workspace" class="collapsed">
+    <!-- 转写 -->
+    <div class="panel">
+        <h3>📝 第一步：语音转文字</h3>
+        <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
+            当前视频：<strong id="currentVideo"></strong>
+        </p>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="startTranscribe()">开始转写</button>
+            <button class="btn btn-warn" onclick="ocrExtract()">OCR提取字幕</button>
+            <button class="btn btn-success" onclick="fuseSubtitle()">融合字幕</button>
+            <input type="file" id="subtitleFile" accept=".srt,.vtt" style="font-size:12px;">
+            <button class="btn btn-warn" onclick="uploadSubtitle()">导入字幕</button>
+        </div>
+    </div>
+
+    <!-- 字幕预览 -->
+    <div class="panel">
+        <h3>💬 字幕预览</h3>
+        <div class="transcript-box" id="transcriptBox">
+            <div class="empty">暂无字幕</div>
+        </div>
+    </div>
+
+    <!-- 按学习模板剪辑 -->
+    <div class="panel" style="border:2px solid #00b894;">
+        <h3 style="color:#00b894;">🎯 第二步：按学习模板剪辑</h3>
+        <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
+            选择学习中心保存的模板，LLM 分析新视频角色后自动删除模板标记的低价值段落。
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div class="field" style="flex:1;min-width:200px;">
+                <label>选择学习模板</label>
+                <select id="templateSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #dfe6e9;">
+                    <option value="">-- 请先在学习中心保存模板 --</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>段前后留白(秒)</label>
+                <input type="number" id="learnMargin" value="0.2" step="0.1" style="width:80px;">
+            </div>
+            <label style="font-size:13px;display:flex;align-items:center;gap:4px;">
+                <input type="checkbox" id="learnAlsoSilence"> 同时去静音
+            </label>
+            <button class="btn btn-success" onclick="clipByTemplate()" style="background:#00b894;">🎬 按模板剪辑</button>
+        </div>
+    </div>
+
+    <!-- 传统剪辑 -->
+    <div class="panel">
+        <h3>✂️ 第三步：传统剪辑（手动参数）</h3>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:240px;">
+                <div class="field">
+                    <label>静音阈值 (dB)</label>
+                    <input type="number" id="noiseDb" value="-30" step="1">
+                    <div class="desc">越小越严格。-30 宽松，-40 严格</div>
+                </div>
+                <div class="field">
+                    <label>最短静音时长 (秒)</label>
+                    <input type="number" id="minDuration" value="0.5" step="0.1">
+                </div>
+            </div>
+            <div style="flex:1;min-width:240px;">
+                <div class="field">
+                    <label>关键词黑名单</label>
+                    <textarea id="keywords" placeholder="广告,关注,点赞,谢谢观看"></textarea>
+                </div>
+                <div class="field">
+                    <label>前后留白 (秒)</label>
+                    <input type="number" id="margin" value="0.3" step="0.1">
+                </div>
+                <button class="btn btn-warn btn-sm" onclick="previewKeywords()">预览命中</button>
+            </div>
+            <div style="flex:1;min-width:240px;">
+                <div class="field">
+                    <label>🎲 随机删除（反同质化）</label>
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="randomDelete"> 启用
+                    </label>
+                </div>
+                <div class="field">
+                    <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="smartGap" checked> 智能句中保护
+                    </label>
+                </div>
+                <div class="field">
+                    <label>最少删除比例</label>
+                    <input type="number" id="minRatio" value="0.5" step="0.1" min="0" max="1">
+                </div>
+                <div class="field">
+                    <label>最多删除比例</label>
+                    <input type="number" id="maxRatio" value="1.0" step="0.1" min="0" max="1">
+                </div>
+            </div>
+        </div>
+        <div class="btn-row" style="margin-top:20px;border-top:1px solid #ecf0f1;padding-top:16px;">
+            <button class="btn btn-success" onclick="clipSilence()">① 删除静音</button>
+            <button class="btn btn-success" onclick="clipNoText()">② 删除无文字</button>
+            <button class="btn btn-success" onclick="clipKeywords()">③ 删除关键词</button>
+            <button class="btn btn-primary" onclick="clipCombo()">④ 组合剪辑</button>
+            <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" id="removeNoText" checked> 组合含去无文字
+            </label>
+        </div>
+    </div>
+
+    <!-- 剪辑结果 -->
+    <div class="panel">
+        <h3>📦 剪辑结果</h3>
+        <div id="resultList">
+            <div class="empty">暂无剪辑结果</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/clip.js"></script>
+{% endblock %}

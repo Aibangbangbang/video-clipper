@@ -26,5 +26,16 @@ def on_startup():
 
 
 @app.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def index():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/learn")
+
+
+@app.get("/learn")
+async def learn_page(request: Request):
+    return templates.TemplateResponse("learn.html", {"request": request})
+
+
+@app.get("/clip")
+async def clip_page(request: Request):
+    return templates.TemplateResponse("clip.html", {"request": request})

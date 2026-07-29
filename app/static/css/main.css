@@ -2,9 +2,13 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, "Microsoft YaHei", sans-serif; background: #f5f6fa; color: #2d3436; }
 
-.app-header { background: #2d3436; color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+.app-header { background: #2d3436; color: #fff; padding: 16px 32px; }
 .app-header h1 { font-size: 20px; font-weight: 600; }
 .app-header .subtitle { font-size: 13px; color: #b2bec3; }
+.top-nav { display: flex; gap: 8px; }
+.top-nav .nav-item { color: #b2bec3; text-decoration: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; transition: all .2s; }
+.top-nav .nav-item:hover { color: #fff; background: rgba(255,255,255,.1); }
+.top-nav .nav-item.active { color: #fff; background: #6c5ce7; }
 
 .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
 

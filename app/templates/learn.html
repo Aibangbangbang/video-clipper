@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}学习中心 - 视频智能系统{% endblock %}
+{% block subtitle %}学习文案结构 · 分析角色 · 保存剪辑模板{% endblock %}
+{% block nav_learn %}active{% endblock %}
+
+{% block content %}
+<!-- 上传区 -->
+<div class="upload-zone" id="uploadZone">
+    <div class="icon">📹</div>
+    <div class="hint">上传参考视频（学习用）— 点击或拖拽 mp4/mkv/avi/mov/webm</div>
+    <input type="file" id="fileInput" accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.ts">
+</div>
+
+<!-- 视频列表 -->
+<div class="video-list" id="videoList"></div>
+
+<!-- 学习工作区 -->
+<div id="workspace" class="collapsed">
+    <!-- 转写 -->
+    <div class="panel">
+        <h3>📝 第一步：语音转文字</h3>
+        <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
+            当前视频：<strong id="currentVideo"></strong>
+        </p>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="startTranscribe()">开始转写</button>
+            <button class="btn btn-warn" onclick="ocrExtract()">OCR提取字幕</button>
+            <button class="btn btn-success" onclick="fuseSubtitle()">融合字幕</button>
+            <input type="file" id="subtitleFile" accept=".srt,.vtt" style="font-size:12px;">
+            <button class="btn btn-warn" onclick="uploadSubtitle()">导入字幕</button>
+        </div>
+    </div>
+
+    <!-- 字幕预览 -->
+    <div class="panel">
+        <h3>💬 字幕预览</h3>
+        <div class="transcript-box" id="transcriptBox">
+            <div class="empty">暂无字幕</div>
+        </div>
+    </div>
+
+    <!-- 学习分析 -->
+    <div class="panel" style="border:2px solid #6c5ce7;">
+        <h3 style="color:#6c5ce7;">🧠 第二步：学习分析（LLM 文案角色分类）</h3>
+        <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
+            LLM 将每段语音分类为文案角色：hook / 痛点 / 产品 / 案例 / 总结 / CTA / 废话 / 重复。
+            点击角色卡片切换「保留/删除」，保存为剪辑模板供剪辑模块使用。
+        </p>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="analyzeScript()" style="background:#6c5ce7;">🔍 学习分析</button>
+            <span id="analyzeStatus" style="font-size:13px;color:#636e72;"></span>
+        </div>
+
+        <div id="analysisResult" style="display:none;margin-top:16px;">
+            <h4 style="margin-bottom:8px;">角色分布（点击切换保留/删除）</h4>
+            <div id="roleStats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+
+            <h4 style="margin-bottom:8px;">段落分析</h4>
+            <div id="analyzedSegments" style="max-height:300px;overflow-y:auto;border:1px solid #ecf0f1;border-radius:8px;padding:8px;margin-bottom:16px;"></div>
+
+            <h4 style="margin-bottom:8px;">保存为模板</h4>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+                <div class="field" style="flex:1;min-width:200px;">
+                    <label>模板名称</label>
+                    <input type="text" id="tplName" placeholder="如：健康产品带货模板" style="width:100%;">
+                </div>
+                <button class="btn btn-success" onclick="saveTemplate()" style="background:#6c5ce7;">💾 保存模板</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模板管理 -->
+    <div class="panel">
+        <h3>📋 已保存的学习模板</h3>
+        <div id="templateList">
+            <div class="empty">暂无模板</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/learn.js"></script>
+{% endblock %}
