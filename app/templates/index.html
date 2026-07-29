@@ -10,7 +10,7 @@
     <div class="app-header">
         <div>
             <h1>🎬 视频智能剪辑系统</h1>
-            <div class="subtitle">静音删除 · 语音转文字 · 关键词删片 · 无文字删除</div>
+            <div class="subtitle">静音删除 · 语音转文字 · 关键词删片 · 无文字删除 · OCR字幕融合</div>
         </div>
     </div>
 
@@ -36,6 +36,8 @@
                 </p>
                 <div class="btn-row">
                     <button class="btn btn-primary" onclick="startTranscribe()">开始转写</button>
+                    <button class="btn btn-warn" onclick="ocrExtract()">OCR提取字幕</button>
+                    <button class="btn btn-success" onclick="fuseSubtitle()">融合字幕(OCR+语音)</button>
                     <input type="file" id="subtitleFile" accept=".srt,.vtt" style="font-size:12px;">
                     <button class="btn btn-warn" onclick="uploadSubtitle()">导入字幕</button>
                 </div>

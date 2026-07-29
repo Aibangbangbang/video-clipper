@@ -20,6 +20,8 @@ from app.services.silence_detector import (
     randomize_removed_ranges, classify_and_randomize,
 )
 from app.services.keyword_filter import filter_by_keywords, merge_ranges, segments_to_keep_ranges
+from app.services.ocr_extractor import extract_subtitle_ocr
+from app.services.subtitle_fusion import fuse_subtitles
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -215,6 +217,82 @@ async def get_transcript(video_id: str):
         }
     finally:
         db.close()
+
+
+# ─── OCR 字幕提取 + 融合 ───
+
+@router.post("/{video_id}/ocr-extract")
+async def ocr_extract(video_id: str, background_tasks: BackgroundTasks):
+    """OCR 提取视频画面中的硬字幕"""
+    db = SessionLocal()
+    try:
+        v = db.query(Video).filter(Video.id == video_id).first()
+        if not v:
+            raise HTTPException(404, "视频不存在")
+        filepath = v.filepath
+    finally:
+        db.close()
+
+    def _do():
+        segments = extract_subtitle_ocr(filepath)
+        # 存入数据库（单独的 OCR 字幕字段）
+        db2 = SessionLocal()
+        try:
+            t = db2.query(Transcript).filter(Transcript.video_id == video_id).first()
+            if not t:
+                t = Transcript(video_id=video_id, segments=segments,
+                               full_text=" ".join(s["text"] for s in segments),
+                               language="zh")
+                db2.add(t)
+            else:
+                t.ocr_segments = segments
+            db2.commit()
+            return {"segments": segments, "count": len(segments)}
+        finally:
+            db2.close()
+
+    result = await asyncio.to_thread(_do)
+    return result
+
+
+@router.post("/{video_id}/fuse-subtitle")
+async def fuse_subtitle(video_id: str):
+    """融合 OCR 字幕和 ASR 语音转写"""
+    db = SessionLocal()
+    try:
+        v = db.query(Video).filter(Video.id == video_id).first()
+        if not v:
+            raise HTTPException(404, "视频不存在")
+        t = db.query(Transcript).filter(Transcript.video_id == video_id).first()
+        if not t:
+            raise HTTPException(400, "请先完成转写和 OCR 提取")
+        asr_segments = t.segments or []
+        ocr_segments = getattr(t, 'ocr_segments', None) or []
+    finally:
+        db.close()
+
+    if not asr_segments and not ocr_segments:
+        raise HTTPException(400, "无字幕数据可融合")
+
+    fused = fuse_subtitles(ocr_segments, asr_segments)
+
+    # 更新数据库
+    db2 = SessionLocal()
+    try:
+        t = db2.query(Transcript).filter(Transcript.video_id == video_id).first()
+        if t:
+            t.segments = fused
+            t.full_text = " ".join(s["text"] for s in fused)
+            db2.commit()
+    finally:
+        db2.close()
+
+    return {
+        "fused_segments": fused,
+        "count": len(fused),
+        "ocr_count": len(ocr_segments),
+        "asr_count": len(asr_segments),
+    }
 
 
 # ─── 剪辑：静音删除 ───

@@ -126,6 +126,27 @@ async function uploadSubtitle() {
     } catch (e) { toast(e.message, 'error'); }
 }
 
+// ─── OCR 字幕提取 + 融合 ───
+async function ocrExtract() {
+    if (!currentVideoId) return;
+    try {
+        toast('OCR 提取中，请等待...', 'info');
+        const data = await api(`${API}/${currentVideoId}/ocr-extract`, { method: 'POST' });
+        toast(`OCR 完成：识别到 ${data.count} 段字幕`, 'success');
+        await loadTranscript();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function fuseSubtitle() {
+    if (!currentVideoId) return;
+    try {
+        toast('正在融合 OCR + 语音...', 'info');
+        const data = await api(`${API}/${currentVideoId}/fuse-subtitle`, { method: 'POST' });
+        toast(`融合完成：OCR ${data.ocr_count} 段 + ASR ${data.asr_count} 段 -> ${data.count} 段`, 'success');
+        await loadTranscript();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
 // ─── 字幕 ───
 async function loadTranscript() {
     if (!currentVideoId) return;

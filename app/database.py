@@ -29,7 +29,8 @@ class Transcript(Base):
     __tablename__ = "transcripts"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     video_id = Column(String, nullable=False, index=True)
-    segments = Column(JSON, default=list)     # [{start, end, text}]
+    segments = Column(JSON, default=list)     # [{start, end, text, source}]
+    ocr_segments = Column(JSON, default=list)  # OCR 提取的字幕段
     full_text = Column(Text, default="")
     language = Column(String, default="zh")
 
