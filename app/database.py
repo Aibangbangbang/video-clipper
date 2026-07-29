@@ -40,12 +40,27 @@ class ClipResult(Base):
     __tablename__ = "clip_results"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     video_id = Column(String, nullable=False, index=True)
-    clip_type = Column(String, nullable=False)  # silence / keyword / combo
+    clip_type = Column(String, nullable=False)  # silence / keyword / combo / learn
     keep_ranges = Column(JSON, default=list)    # 保留的区间 [{start, end}]
     removed_ranges = Column(JSON, default=list)  # 删除的区间
     output_path = Column(String, nullable=True)
     params = Column(JSON, default=dict)         # 参数快照
     created_at = Column(Text, default=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class LearningTemplate(Base):
+    """学习模板 - 从参考视频学到的文案结构和剪辑规则"""
+    __tablename__ = "learning_templates"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)             # 模板名称
+    description = Column(Text, default="")            # 模板描述
+    source_video_id = Column(String, nullable=True)   # 学习来源视频
+    delete_roles = Column(JSON, default=list)         # 要删除的角色 ["filler","repeat"]
+    keep_roles = Column(JSON, default=list)           # 保留的角色
+    role_stats = Column(JSON, default=dict)           # 角色统计 {role:{count,duration,ratio,examples}}
+    analyzed_segments = Column(JSON, default=list)    # 来源视频的完整分析（含角色标签）
+    created_at = Column(Text, default=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at = Column(Text, nullable=True)
 
 
 def init_db():

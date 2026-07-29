@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi import Request
 
 from app.database import init_db
-from app.routers import videos
+from app.routers import videos, learn
 
 BASE_DIR = Path(__file__).parent
 
@@ -16,6 +16,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 app.include_router(videos.router)
+app.include_router(learn.router)
 
 
 @app.on_event("startup")

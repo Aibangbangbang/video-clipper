@@ -10,7 +10,7 @@
     <div class="app-header">
         <div>
             <h1>🎬 视频智能剪辑系统</h1>
-            <div class="subtitle">静音删除 · 语音转文字 · 关键词删片 · 无文字删除 · OCR字幕融合</div>
+            <div class="subtitle">学习文案结构 · 智能剪辑 · 静音删除 · 语音转文字 · OCR字幕融合</div>
         </div>
     </div>
 
@@ -27,7 +27,7 @@
 
         <!-- 工作区 -->
         <div id="workspace" class="collapsed">
-            <!-- 语音转文字 -->
+            <!-- 第一步：语音转文字 -->
             <div class="panel">
                 <h3>📝 第一步：语音转文字</h3>
                 <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
@@ -51,10 +51,74 @@
                 </div>
             </div>
 
-            <!-- 剪辑设置 -->
-            <div class="panel">
-                <h3>✂️ 第二步：智能剪辑</h3>
+            <!-- ═══════════ 学习中心 ═══════════ -->
+            <div class="panel" style="border:2px solid #6c5ce7;">
+                <h3 style="color:#6c5ce7;">🧠 第二步：学习中心（分析文案结构 → 保存模板）</h3>
+                <p style="font-size:13px;color:#636e72;margin-bottom:12px;">
+                    上传参考视频并转写后，点击「学习分析」，LLM 会把每段语音分类为文案角色
+                    （hook/痛点/产品/案例/总结/CTA/废话/重复）。选择要删除的角色，保存为剪辑模板。
+                </p>
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="analyzeScript()" style="background:#6c5ce7;">🔍 学习分析</button>
+                    <span id="analyzeStatus" style="font-size:13px;color:#636e72;"></span>
+                </div>
 
+                <!-- 分析结果 -->
+                <div id="analysisResult" style="display:none;margin-top:16px;">
+                    <h4 style="margin-bottom:8px;">角色分布</h4>
+                    <div id="roleStats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+
+                    <h4 style="margin-bottom:8px;">段落分析</h4>
+                    <div id="analyzedSegments" style="max-height:300px;overflow-y:auto;border:1px solid #ecf0f1;border-radius:8px;padding:8px;margin-bottom:16px;"></div>
+
+                    <h4 style="margin-bottom:8px;">保存为模板</h4>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+                        <div class="field" style="flex:1;min-width:200px;">
+                            <label>模板名称</label>
+                            <input type="text" id="tplName" placeholder="如：健康产品带货模板" style="width:100%;">
+                        </div>
+                        <button class="btn btn-success" onclick="saveTemplate()" style="background:#6c5ce7;">💾 保存模板</button>
+                    </div>
+                    <div style="font-size:12px;color:#636e72;margin-top:8px;">
+                        默认删除「废话填充」和「重复内容」，可在下方角色卡片点击切换保留/删除
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模板列表 -->
+            <div class="panel">
+                <h3>📋 已保存的学习模板</h3>
+                <div id="templateList">
+                    <div class="empty">暂无模板，请先学习分析并保存</div>
+                </div>
+            </div>
+
+            <!-- ═══════════ 智能剪辑 ═══════════ -->
+            <div class="panel" style="border:2px solid #00b894;">
+                <h3 style="color:#00b894;">✂️ 第三步：智能剪辑</h3>
+
+                <!-- 按学习模板剪辑 -->
+                <div style="background:#f0fff4;border-radius:8px;padding:12px;margin-bottom:16px;">
+                    <h4 style="color:#00b894;margin-bottom:8px;">🎯 按学习模板剪辑（应用学习结果）</h4>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+                        <div class="field" style="flex:1;min-width:200px;">
+                            <label>选择学习模板</label>
+                            <select id="templateSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #dfe6e9;">
+                                <option value="">-- 请先保存模板 --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>段前后留白(秒)</label>
+                            <input type="number" id="learnMargin" value="0.2" step="0.1" style="width:80px;">
+                        </div>
+                        <label style="font-size:13px;display:flex;align-items:center;gap:4px;">
+                            <input type="checkbox" id="learnAlsoSilence"> 同时去静音
+                        </label>
+                        <button class="btn btn-success" onclick="clipByTemplate()" style="background:#00b894;">🎬 按模板剪辑</button>
+                    </div>
+                </div>
+
+                <!-- 传统剪辑参数 -->
                 <div style="display:flex;gap:24px;flex-wrap:wrap;">
                     <div style="flex:1;min-width:240px;">
                         <div class="field">
