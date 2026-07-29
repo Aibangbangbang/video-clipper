@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List
 
 from app.config import config
-from app.services.silence_detector import Range
+from app.services.silence_detector import Range, merge_close_ranges
 
 
 class Clipper:
@@ -95,6 +95,11 @@ class Clipper:
         """
         if not keep_ranges:
             raise ValueError("保留区间为空，无法剪辑")
+
+        # 合并间隔 < 0.3s 的相邻保留区间，避免跳帧
+        # 如果两个保留片段之间只隔 0.1s 的删除，拼接后画面会跳变
+        keep_ranges = merge_close_ranges(keep_ranges, min_gap=0.3)
+        print(f"  合并相邻区间(间隔<0.3s)后: {len(keep_ranges)} 段")
 
         input_path = Path(input_path).resolve()
         out_path = self.output_dir / f"{output_name}.mp4"

@@ -199,37 +199,51 @@ def scatter_delete_range(
 ) -> List[Range]:
     """散粒删除：在区间内每隔随机帧数删除 1-2 帧
 
-    用于「句中 gap」场景：无音/无字幕片段位于一句完整的话中间，
-    不大面积删除（避免切断语义），而是每隔随机帧数删掉 1-2 帧，
-    既消除同质化又保持语音连贯。
-
-    Args:
-        r:   待处理区间
-        fps: 视频帧率，用于计算帧时长
-        seed: 随机种子
-
-    Returns:
-        实际删除的微小区间列表（每个 1-2 帧）
+    .. deprecated:: 此函数会产生大量微片段拼接导致跳帧，不再用于句中 gap。
+       保留仅供测试参考。
     """
     rng = random.Random(seed) if seed is not None else random.Random()
     frame_dur = 1.0 / fps
     duration = r.end - r.start
     if duration <= frame_dur * 3:
-        # 太短，不值得散粒删除，跳过
         return []
 
     deleted = []
-    pos = r.start + rng.uniform(0, frame_dur * 2)  # 随机起始偏移
+    pos = r.start + rng.uniform(0, frame_dur * 2)
     while pos < r.end - frame_dur:
-        # 随机删除 1-2 帧
         n_frames = rng.randint(1, 2)
         del_end = min(pos + n_frames * frame_dur, r.end)
         deleted.append(Range(pos, del_end))
-        # 随机间隔 3-15 帧后继续
         gap_frames = rng.randint(3, 15)
         pos = del_end + gap_frames * frame_dur
 
     return deleted
+
+
+def merge_close_ranges(ranges: List[Range], min_gap: float = 0.3) -> List[Range]:
+    """合并间隔小于 min_gap 的相邻区间，避免产生跳帧
+
+    如果两个保留区间之间只隔 0.1s 的删除区间，删除后拼接会造成画面跳变。
+    合并后这段删除区间被保留，画面连续。
+
+    Args:
+        ranges:   已排序的区间列表
+        min_gap:  最小间隔阈值（秒），间隔小于此值的相邻区间合并
+
+    Returns:
+        合并后的区间列表
+    """
+    if not ranges:
+        return []
+    ranges = sorted(ranges, key=lambda r: r.start)
+    merged = [Range(ranges[0].start, ranges[0].end)]
+    for r in ranges[1:]:
+        if r.start - merged[-1].end < min_gap:
+            # 间隔太小，合并（保留中间的 gap）
+            merged[-1].end = max(merged[-1].end, r.end)
+        else:
+            merged.append(Range(r.start, r.end))
+    return merged
 
 
 def classify_and_randomize(
@@ -292,14 +306,8 @@ def classify_and_randomize(
         )
 
         if is_mid_sentence:
-            # 句中 gap：散粒删除 1-2 帧
-            scattered = scatter_delete_range(r, fps=fps, seed=rng.randint(0, 999999))
-            if scattered:
-                actual.extend(scattered)
-                print(f"  [句中gap] {r.start:.2f}-{r.end:.2f} ({dur:.2f}s) "
-                      f"-> 散粒删除 {len(scattered)} 处")
-            else:
-                print(f"  [句中gap] {r.start:.2f}-{r.end:.2f} ({dur:.2f}s) -> 跳过(太短)")
+            # 句中 gap：完全不删，保留画面连续（散粒删除会导致跳帧）
+            print(f"  [句中gap] {r.start:.2f}-{r.end:.2f} ({dur:.2f}s) -> 保留(不删除)")
         else:
             # 句间 gap：大面积随机删除
             ratio = rng.uniform(min_ratio, max_ratio)
