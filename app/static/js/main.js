@@ -154,12 +154,21 @@ function renderTranscript(segs, hitIndices = []) {
     `).join('');
 }
 
+// ─── 工具：获取随机删除参数 ───
+function getRandomParams() {
+    return {
+        random_delete: document.getElementById('randomDelete').checked,
+        min_ratio: parseFloat(document.getElementById('minRatio').value) || 0.5,
+        max_ratio: parseFloat(document.getElementById('maxRatio').value) || 1.0,
+    };
+}
+
 // ─── 静音删除 ───
 async function clipSilence() {
     if (!currentVideoId) return;
     const noiseDb = document.getElementById('noiseDb').value;
     const minDur = document.getElementById('minDuration').value;
-    const body = {};
+    const body = { ...getRandomParams() };
     if (noiseDb) body.noise_db = parseFloat(noiseDb);
     if (minDur) body.min_duration = parseFloat(minDur);
     try {
@@ -177,11 +186,12 @@ async function clipSilence() {
 async function clipNoText() {
     if (!currentVideoId) return;
     const margin = parseFloat(document.getElementById('margin').value) || 0.2;
+    const body = { margin, ...getRandomParams() };
     try {
         toast('正在删除无文字片段...', 'info');
         const data = await api(`${API}/${currentVideoId}/clip-no-text`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ margin }),
+            body: JSON.stringify(body),
         });
         toast(`完成：保留${data.keep_count}段，删除${data.removed_count}段`, 'success');
         await loadResults();
@@ -231,7 +241,7 @@ async function clipCombo() {
     const minDur = document.getElementById('minDuration').value;
     const margin = parseFloat(document.getElementById('margin').value) || 0.3;
     const removeNoText = document.getElementById('removeNoText').checked;
-    const body = { keywords: kws, margin, remove_no_text: removeNoText };
+    const body = { keywords: kws, margin, remove_no_text: removeNoText, ...getRandomParams() };
     if (noiseDb) body.noise_db = parseFloat(noiseDb);
     if (minDur) body.min_duration = parseFloat(minDur);
     try {

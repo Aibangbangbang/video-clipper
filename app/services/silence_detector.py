@@ -1,8 +1,9 @@
 """静音检测服务 - 用 ffmpeg silencedetect 检测无声片段，反推有声保留区间"""
 import re
+import random
 import subprocess
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from app.config import config
 
@@ -148,3 +149,44 @@ def complement_ranges(keep: List[Range], duration: float) -> List[Range]:
     if prev_end < duration:
         removed.append(Range(prev_end, duration))
     return removed
+
+
+def randomize_removed_ranges(
+    removed: List[Range],
+    min_ratio: float = 0.5,
+    max_ratio: float = 1.0,
+    seed: Optional[int] = None,
+) -> List[Range]:
+    """对每个待删除区间，随机选择一个子区间实际删除（反同质化）
+
+    如某静音片段有 10 帧，可能只删前 2 帧或中间 5 帧，保留剩余部分。
+    每次运行结果不同，使输出视频略有差异。
+
+    Args:
+        removed:    原始待删除区间列表
+        min_ratio:  每段最少删除比例 (0.0-1.0)
+        max_ratio:  每段最多删除比例 (0.0-1.0)，1.0=可整段删除
+        seed:       随机种子，None=每次不同
+
+    Returns:
+        实际删除的子区间列表（每个子区间都在原区间内部）
+    """
+    rng = random.Random(seed) if seed is not None else random.Random()
+
+    actual = []
+    for r in removed:
+        duration = r.end - r.start
+        if duration <= 0:
+            continue
+        # 随机选择实际删除比例
+        ratio = rng.uniform(min_ratio, max_ratio)
+        delete_len = duration * ratio
+        # 随机选择删除起始位置
+        max_offset = duration - delete_len
+        if max_offset <= 0:
+            actual.append(Range(r.start, r.end))
+        else:
+            offset = rng.uniform(0, max_offset)
+            actual.append(Range(r.start + offset, r.start + offset + delete_len))
+
+    return actual

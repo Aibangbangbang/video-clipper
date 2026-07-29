@@ -80,6 +80,26 @@
                         </div>
                         <button class="btn btn-warn btn-sm" onclick="previewKeywords()">预览命中</button>
                     </div>
+
+                    <div style="flex:1;min-width:240px;">
+                        <div class="field">
+                            <label>🎲 随机删除（反同质化）</label>
+                            <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" id="randomDelete"> 启用随机删除帧
+                            </label>
+                            <div class="desc">不整段删除，而是随机删除片段中部分帧，每次结果不同</div>
+                        </div>
+                        <div class="field">
+                            <label>最少删除比例</label>
+                            <input type="number" id="minRatio" value="0.5" step="0.1" min="0" max="1">
+                            <div class="desc">每个片段至少删除的比例（0.5=至少删一半）</div>
+                        </div>
+                        <div class="field">
+                            <label>最多删除比例</label>
+                            <input type="number" id="maxRatio" value="1.0" step="0.1" min="0" max="1">
+                            <div class="desc">每个片段最多删除的比例（1.0=可整段删除）</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="btn-row" style="margin-top:20px;border-top:1px solid #ecf0f1;padding-top:16px;">
