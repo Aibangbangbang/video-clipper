@@ -83,6 +83,7 @@ class Clipper:
         """
         按保留区间切片并合并为一个视频。
         使用 filter_complex trim+concat，帧级精确，一次完成。
+        每个音频片段首尾加微淡入淡出，消除拼接点"咻"声。
 
         Args:
             input_path: 源视频路径
@@ -99,6 +100,9 @@ class Clipper:
         out_path = self.output_dir / f"{output_name}.mp4"
         has_audio = self.has_audio(str(input_path))
 
+        # 音频淡入淡出时长（秒），消除拼接点波形突变
+        FADE = 0.01  # 10ms
+
         n = len(keep_ranges)
         filters = []
         concat_inputs = []
@@ -113,9 +117,15 @@ class Clipper:
                 filters.append(
                     f"[0:v]trim=start={s:.4f}:end={e:.4f},setpts=PTS-STARTPTS[v{i}]"
                 )
-                filters.append(
-                    f"[0:a]atrim=start={s:.4f}:end={e:.4f},asetpts=PTS-STARTPTS[a{i}]"
-                )
+                # 音频：atrim + asetpts + 首尾淡入淡出
+                # 对极短片段，淡入淡出各取时长的 1/3，避免重叠
+                fade = min(FADE, dur / 3) if dur > 0.003 else 0.0
+                fade_out_st = max(0.0, dur - fade)
+                a_chain = f"[0:a]atrim=start={s:.4f}:end={e:.4f},asetpts=PTS-STARTPTS"
+                if fade > 0.001:
+                    a_chain += f",afade=t=in:st=0:d={fade:.4f},afade=t=out:st={fade_out_st:.4f}:d={fade:.4f}"
+                a_chain += f"[a{i}]"
+                filters.append(a_chain)
                 concat_inputs.append(f"[v{i}][a{i}]")
             else:
                 filters.append(
@@ -140,11 +150,12 @@ class Clipper:
 
         cmd += [
             "-c:v", self._codec, "-crf", str(self._crf),
-            "-c:a", "aac", "-movflags", "+faststart",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
             str(out_path),
         ]
 
-        print(f"  合并 {n} 个片段 → {out_path.name}")
+        print(f"  合并 {n} 个片段 -> {out_path.name} (音频淡入淡出 {FADE*1000:.0f}ms)")
         r = self._run(cmd, timeout=600)
 
         if r.returncode != 0 or not out_path.exists() or out_path.stat().st_size < 1000:
